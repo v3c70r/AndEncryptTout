@@ -59,7 +59,6 @@ public class MainActivityFragment extends Fragment {
         final ListView listView = (ListView) rootView.findViewById(R.id.listView_pwd);
         listView.setAdapter(mPwdAdapter);
 
-        //TODO:Adding listeners
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {

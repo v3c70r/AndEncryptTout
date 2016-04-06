@@ -9,6 +9,7 @@ import android.support.v7.widget.Toolbar;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -44,10 +45,21 @@ public class MainActivity extends AppCompatActivity {
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
+        int PICKFILE_REQUEST_CODE=1;
         if (id == R.id.action_settings) {
+            int CODE=1;
+            Intent selectFileIntent = new Intent(Intent.ACTION_GET_CONTENT);
+            selectFileIntent.setType("*/*");
+            startActivityForResult(selectFileIntent, CODE);
             return true;
         }
-
         return super.onOptionsItemSelected(item);
+    }
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data)
+    {
+        String Fpath = data.getDataString();
+        Toast.makeText(MainActivity.this, Fpath+" Selected", Toast.LENGTH_SHORT).show();
+        super.onActivityResult(requestCode, resultCode, data);
     }
 }
