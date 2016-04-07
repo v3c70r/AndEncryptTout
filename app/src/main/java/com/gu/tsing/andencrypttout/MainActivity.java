@@ -36,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
         getMenuInflater().inflate(R.menu.menu_main, menu);
         return true;
     }
+    private final int SELECTOR_CODE=1;
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
@@ -45,12 +46,12 @@ public class MainActivity extends AppCompatActivity {
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        int PICKFILE_REQUEST_CODE=1;
-        if (id == R.id.action_settings) {
-            int CODE=1;
+        if (id == R.id.action_select_file) {
             Intent selectFileIntent = new Intent(Intent.ACTION_GET_CONTENT);
             selectFileIntent.setType("*/*");
-            startActivityForResult(selectFileIntent, CODE);
+            startActivityForResult(selectFileIntent, SELECTOR_CODE);
+        }
+        if (R.id.action_settings == id) {
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -58,8 +59,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data)
     {
-        String Fpath = data.getDataString();
-        Toast.makeText(MainActivity.this, Fpath+" Selected", Toast.LENGTH_SHORT).show();
+        switch (requestCode) {
+            case SELECTOR_CODE:
+            if (resultCode == RESULT_OK) {
+                String Fpath = data.getDataString();
+                Toast.makeText(MainActivity.this, Fpath + " Selected", Toast.LENGTH_SHORT).show();
+            }
+            break;
+        }
         super.onActivityResult(requestCode, resultCode, data);
     }
 }
