@@ -11,8 +11,14 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
+import org.openintents.openpgp.util.OpenPgpAppPreference;
+import org.openintents.openpgp.util.OpenPgpKeyPreference;
+
+
 public class MainActivity extends AppCompatActivity {
 
+    OpenPgpKeyPreference mKey;
+    OpenPgpAppPreference mProvider;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -51,7 +57,9 @@ public class MainActivity extends AppCompatActivity {
             selectFileIntent.setType("*/*");
             startActivityForResult(selectFileIntent, SELECTOR_CODE);
         }
-        if (R.id.action_settings == id) {
+        if (R.id.action_settings ==  id) {
+            Intent settingIntent = new Intent(this, SettingsActivity.class);
+            startActivity(settingIntent);
             return true;
         }
         return super.onOptionsItemSelected(item);

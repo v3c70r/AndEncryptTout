@@ -1,10 +1,14 @@
 package com.gu.tsing.andencrypttout;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,6 +17,12 @@ import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
+
+import org.openintents.openpgp.IOpenPgpService2;
+import org.openintents.openpgp.util.OpenPgpApi;
+import org.openintents.openpgp.util.OpenPgpAppPreference;
+import org.openintents.openpgp.util.OpenPgpKeyPreference;
+import org.openintents.openpgp.util.OpenPgpServiceConnection;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,28 +37,67 @@ public class MainActivityFragment extends Fragment {
     }
 
     private ArrayAdapter<String> mPwdAdapter;
+    private OpenPgpServiceConnection mServiceConnection;
+    private long mSignKeyId;
+    private String pwdFilePath;
+    SharedPreferences settings;
+
+    @Override
+    public void onStop() {
+        super.onStop();
+    }
+
+    @Override
+    public  void onStart() {
+        super.onStart();
+        pwdFilePath = settings.getString("pwd_selector","");
+        Toast.makeText(getActivity(), pwdFilePath + " Selected", Toast.LENGTH_SHORT).show();    //Debugging
+        String providerPackageName = settings.getString("openpgp_provider_list", "");
+        mSignKeyId = settings.getLong("openpgp_key", 0);
+        pwdFilePath = settings.getString("pwd_selector","");
+
+        if (TextUtils.isEmpty(providerPackageName)) {
+            Toast.makeText(getContext(), "No OpenPGP app selected!", Toast.LENGTH_LONG).show();
+            //getActivity().finish();
+        } else if (mSignKeyId == 0) {
+            Toast.makeText(getContext(), "No key selected!", Toast.LENGTH_LONG).show();
+            //getActivity().finish();
+        } else {
+            // bind to service
+            mServiceConnection = new OpenPgpServiceConnection(
+                    getContext(),
+                    providerPackageName,
+                    new OpenPgpServiceConnection.OnBound() {
+                        @Override
+                        public void onBound(IOpenPgpService2 service) {
+                            Log.d(OpenPgpApi.TAG, "onBound!");
+                        }
+
+                        @Override
+                        public void onError(Exception e) {
+                            Log.e(OpenPgpApi.TAG, "exception when binding!", e);
+                        }
+                    }
+            );
+            mServiceConnection.bindToService();
+        }
+    }
+
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
+        // Init OpenGPG
+        settings = PreferenceManager.getDefaultSharedPreferences(getContext());
+
+        // Decrypt data
+
+
         // Mock data ======================
-        String[] data = {
-                "Today - Sunny - 10/20",
-                "Tomorrow - Sunny - 10/20",
-                "Weds - Sunny - 10/20",
-                "Thurs - Sunny - 10/20",
-                "Fri - Sunny - 10/20",
-                "Sat - Sunny - 10/20",
-                "Fri - Sunny - 10/20",
-                "Fri - Sunny - 10/20",
-                "Fri - Sunny - 10/20",
-                "Fri - Sunny - 10/20",
-                "Fri - Sunny - 10/20",
-                "Fri - Sunny - 10/20",
-                "Fri - Sunny - 10/20",
-                "Fri - Sunny - 10/20"
-        };
-        List<String> dataList = new ArrayList<String>(Arrays.asList(data));
+        String dataStr = "no\nthing\nis\nhere\noops\n";
+
+        List<String> dataList = new ArrayList<String>(Arrays.asList(dataStr.split("\n")));
         mPwdAdapter = new ArrayAdapter<String>(
                 getActivity(),
                 R.layout.list_item_pwd,
