@@ -2,9 +2,11 @@ package com.gu.tsing.andencrypttout;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
+import android.support.v4.content.ContextCompat;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -19,14 +21,25 @@ import android.widget.ListView;
 import android.widget.Toast;
 
 import org.openintents.openpgp.IOpenPgpService2;
+import org.openintents.openpgp.OpenPgpDecryptionResult;
+import org.openintents.openpgp.OpenPgpError;
+import org.openintents.openpgp.OpenPgpSignatureResult;
 import org.openintents.openpgp.util.OpenPgpApi;
 import org.openintents.openpgp.util.OpenPgpAppPreference;
 import org.openintents.openpgp.util.OpenPgpKeyPreference;
 import org.openintents.openpgp.util.OpenPgpServiceConnection;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.jar.Manifest;
 
 /**
  * A placeholder fragment containing a simple view.
@@ -35,6 +48,7 @@ public class MainActivityFragment extends Fragment {
 
     public MainActivityFragment() {
     }
+    public static final int REQUEST_CODE_DECRYPT_AND_VERIFY = 9913;
 
     private ArrayAdapter<String> mPwdAdapter;
     private OpenPgpServiceConnection mServiceConnection;
@@ -50,18 +64,13 @@ public class MainActivityFragment extends Fragment {
     @Override
     public  void onStart() {
         super.onStart();
-        pwdFilePath = settings.getString("pwd_selector","");
-        Toast.makeText(getActivity(), pwdFilePath + " Selected", Toast.LENGTH_SHORT).show();    //Debugging
         String providerPackageName = settings.getString("openpgp_provider_list", "");
         mSignKeyId = settings.getLong("openpgp_key", 0);
         pwdFilePath = settings.getString("pwd_selector","");
 
-        if (TextUtils.isEmpty(providerPackageName)) {
-            Toast.makeText(getContext(), "No OpenPGP app selected!", Toast.LENGTH_LONG).show();
-            //getActivity().finish();
-        } else if (mSignKeyId == 0) {
-            Toast.makeText(getContext(), "No key selected!", Toast.LENGTH_LONG).show();
-            //getActivity().finish();
+        if (TextUtils.isEmpty(providerPackageName) || mSignKeyId==0 || TextUtils.isEmpty(pwdFilePath)) {
+            Toast.makeText(getContext(), "No OpenPGP app, key or pwd file selected!", Toast.LENGTH_LONG).show();
+            startActivity(new Intent(getActivity(), SettingsActivity.class));
         } else {
             // bind to service
             mServiceConnection = new OpenPgpServiceConnection(
@@ -72,14 +81,36 @@ public class MainActivityFragment extends Fragment {
                         public void onBound(IOpenPgpService2 service) {
                             Log.d(OpenPgpApi.TAG, "onBound!");
                         }
-
                         @Override
                         public void onError(Exception e) {
                             Log.e(OpenPgpApi.TAG, "exception when binding!", e);
                         }
                     }
             );
+
             mServiceConnection.bindToService();
+
+            //Permission check
+            if (getActivity().checkSelfPermission(getActivity(), Manifest.permission.MANAGE_DOCUMETNS))
+            //Decrypt file
+            Intent decryptIntent = new Intent();
+            decryptIntent.setAction(OpenPgpApi.ACTION_DECRYPT_VERIFY);
+            InputStream is;
+
+            try{
+                is = getContext().getContentResolver().openInputStream(Uri.parse(pwdFilePath));
+                ByteArrayOutputStream os = new ByteArrayOutputStream();
+                OpenPgpApi api = new OpenPgpApi(getActivity(), mServiceConnection.getService());
+                api.executeApiAsync(decryptIntent, is, os, new MyCallback(false, os, REQUEST_CODE_DECRYPT_AND_VERIFY));
+                is.close();
+            } catch (FileNotFoundException e){
+                showToast("File not found "+pwdFilePath);
+                e.printStackTrace();
+            }
+            catch (IOException e){
+                showToast("Some other errors");
+                e.printStackTrace();
+            }
         }
     }
 
@@ -131,8 +162,92 @@ public class MainActivityFragment extends Fragment {
 
             }
         });
-
-
         return rootView;
+    }
+
+    // =============OpenPgp Callbacks
+    private class MyCallback implements OpenPgpApi.IOpenPgpCallback {
+        boolean returnToCiphertextField;
+        ByteArrayOutputStream os;
+        int requestCode;
+
+        private MyCallback(boolean returnToCiphertextField, ByteArrayOutputStream os, int requestCode) {
+            this.returnToCiphertextField = returnToCiphertextField;
+            this.os = os;
+            this.requestCode = requestCode;
+
+        }
+
+        @Override
+        public void onReturn(Intent result) {
+            switch (result.getIntExtra(OpenPgpApi.RESULT_CODE, OpenPgpApi.RESULT_CODE_ERROR)) {
+                case OpenPgpApi.RESULT_CODE_SUCCESS: {
+                    showToast("RESULT_CODE_SUCCESS");
+
+                    //// encrypt/decrypt/sign/verify
+                    //if (os != null) {
+                    //    try {
+                    //        Log.d(OpenPgpApi.TAG, "result: " + os.toByteArray().length
+                    //                + " str=" + os.toString("UTF-8"));
+
+                    //        if (returnToCiphertextField) {
+                    //            mCiphertext.setText(os.toString("UTF-8"));
+                    //        } else {
+                    //            mMessage.setText(os.toString("UTF-8"));
+                    //        }
+                    //    } catch (UnsupportedEncodingException e) {
+                    //        Log.e(Constants.TAG, "UnsupportedEncodingException", e);
+                    //    }
+                    //}
+                    switch (requestCode) {
+                        case REQUEST_CODE_DECRYPT_AND_VERIFY: {
+                            // RESULT_SIGNATURE and RESULT_DECRYPTION are never null!
+
+                            OpenPgpSignatureResult signatureResult
+                                    = result.getParcelableExtra(OpenPgpApi.RESULT_SIGNATURE);
+                            showToast(signatureResult.toString());
+                            OpenPgpDecryptionResult decryptionResult
+                                    = result.getParcelableExtra(OpenPgpApi.RESULT_DECRYPTION);
+                            showToast(decryptionResult.toString());
+
+                            break;
+                        }
+                        default: {
+                        }
+                    }
+                }
+                case OpenPgpApi.RESULT_CODE_ERROR: {
+                    showToast("RESULT_CODE_ERROR");
+
+                    OpenPgpError error = result.getParcelableExtra(OpenPgpApi.RESULT_ERROR);
+                    handleError(error);
+                    break;
+                }
+            }
+        }
+    }
+    private void handleError(final OpenPgpError error) {
+        getActivity().runOnUiThread(new Runnable() {
+
+            @Override
+            public void run() {
+                Toast.makeText(getActivity(),
+                        "onError id:" + error.getErrorId() + "\n\n" + error.getMessage(),
+                        Toast.LENGTH_LONG).show();
+                Log.e(OpenPgpApi.TAG, "onError getErrorId:" + error.getErrorId());
+                Log.e(OpenPgpApi.TAG, "onError getMessage:" + error.getMessage());
+            }
+        });
+    }
+    private void showToast(final String message) {
+        getActivity().runOnUiThread(new Runnable() {
+
+            @Override
+            public void run() {
+                Toast.makeText(getActivity(),
+                        message,
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 }
